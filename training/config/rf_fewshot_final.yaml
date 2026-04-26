@@ -1,32 +1,53 @@
 defaults:
   - default_dataset.yaml
 
-exp_name: exp001
-img_size: 518
-num_workers: 8
+exp_name: rf_fewshot_final
+img_size: 336
+num_workers: 4
 seed_value: 42
-accum_steps: 2    # We did not use gradient accumulation in our training, while if you suffer from OOM, you can try to use it.
+accum_steps: 1
 patch_size: 14
-val_epoch_freq: 5
-max_img_per_gpu: 48
+val_epoch_freq: 1
+max_img_per_gpu: 8
 
-limit_train_batches: 800
-limit_val_batches: 400
+limit_train_batches: null
+limit_val_batches: null
 
+geometry:
+  # Set these to true only when the selected scenes provide depth/point GT.
+  enable_depth: False
+  enable_point: False
+
+rf_scene_roots: /YOUR/PATH/TO/RF_SCENES
 
 data:
-  # The code for data still looks too complicated. I should refactor this again (do I have time?...)
   train:
     _target_: data.dynamic_dataloader.DynamicTorchDataset
     num_workers: ${num_workers}
     max_img_per_gpu: ${max_img_per_gpu}
+    shuffle: True
+    pin_memory: False
     common_config:
+      fix_img_num: -1
+      fix_aspect_ratio: 1.0
+      load_track: False
+      track_num: 1024
+      training: True
+      inside_random: True
       img_size: ${img_size}
       patch_size: ${patch_size}
+      rescale: True
+      rescale_aug: False
+      landscape_check: False
       debug: False
+      get_nearby: False
+      load_depth: ${geometry.enable_depth}
+      img_nums: [1, 8]
+      max_img_per_gpu: ${max_img_per_gpu}
+      allow_duplicate_img: True
       repeat_batch: False
       rf_feature_root: null
-      rf_layout: legacy
+      rf_layout: scene_local
       rf_subdir: rf_angular_images_gaussian/npz
       rf_feature_key: angular_image
       rf_pack_mode: dense_sparse_mask
@@ -36,23 +57,59 @@ data:
       raw_rf_top_k: 64
       raw_rf_sort_by: pdp_power
       allow_missing_raw_rf: False
+      augs:
+        cojitter: True
+        cojitter_ratio: 0.3
+        scales: null
+        aspects: [0.75, 1.0]
+        color_jitter:
+          brightness: 0.25
+          contrast: 0.25
+          saturation: 0.2
+          hue: 0.05
+          p: 0.8
+        gray_scale: False
+        gau_blur: False
     dataset:
       _target_: data.composed_dataset.ComposedDataset
       dataset_configs:
-        - _target_: data.datasets.co3d.Co3dDataset
-          split: train
-          CO3D_DIR: /YOUR/PATH/TO/CO3D
-          CO3D_ANNOTATION_DIR: /YOUR/PATH/TO/CO3D_ANNOTATION
+        - _target_: data.datasets.rf_scene.RFSceneDataset
+          scene_roots: ${rf_scene_roots}
+          require_rf: True
+          rf_subdir: rf_angular_images_gaussian/npz
+          rf_pack_mode: dense_sparse_mask
+          use_raw_rf_paths: False
+          raw_rf_subdir: rf
+          raw_rf_top_k: 64
+          sampling_strategy: mixed
+          nearby_window: 10
+          wide_baseline_prob: 0.3
   val:
     _target_: data.dynamic_dataloader.DynamicTorchDataset
     num_workers: ${num_workers}
     max_img_per_gpu: ${max_img_per_gpu}
+    shuffle: False
+    pin_memory: False
     common_config:
+      fix_img_num: -1
+      fix_aspect_ratio: 1.0
+      load_track: False
+      track_num: 1024
+      training: False
+      inside_random: False
       img_size: ${img_size}
       patch_size: ${patch_size}
+      rescale: True
+      rescale_aug: False
+      landscape_check: False
       debug: False
+      get_nearby: False
+      load_depth: ${geometry.enable_depth}
+      img_nums: [1, 8]
+      allow_duplicate_img: True
+      repeat_batch: False
       rf_feature_root: null
-      rf_layout: legacy
+      rf_layout: scene_local
       rf_subdir: rf_angular_images_gaussian/npz
       rf_feature_key: angular_image
       rf_pack_mode: dense_sparse_mask
@@ -62,20 +119,32 @@ data:
       raw_rf_top_k: 64
       raw_rf_sort_by: pdp_power
       allow_missing_raw_rf: False
+      augs:
+        cojitter: False
+        cojitter_ratio: 0.5
+        scales: null
+        aspects: [1.0, 1.0]
+        color_jitter: null
+        gray_scale: False
+        gau_blur: False
     dataset:
       _target_: data.composed_dataset.ComposedDataset
       dataset_configs:
-        - _target_: data.datasets.co3d.Co3dDataset
-          split: test
-          CO3D_DIR: /YOUR/PATH/TO/CO3D
-          CO3D_ANNOTATION_DIR: /YOUR/PATH/TO/CO3D_ANNOTATION
-
+        - _target_: data.datasets.rf_scene.RFSceneDataset
+          scene_roots: ${rf_scene_roots}
+          require_rf: True
+          rf_subdir: rf_angular_images_gaussian/npz
+          rf_pack_mode: dense_sparse_mask
+          use_raw_rf_paths: False
+          raw_rf_subdir: rf
+          raw_rf_top_k: 64
+          sampling_strategy: uniform
 
 logging:
   log_dir: logs
   log_visuals: False
-  log_freq: 1
-  log_level_primary: DEBUG
+  log_freq: 10
+  log_level_primary: INFO
   log_level_secondary: WARNING
   all_ranks: False
   tensorboard_writer:
@@ -92,6 +161,9 @@ logging:
         - loss_conf_depth
         - loss_reg_depth
         - loss_grad_depth
+        - loss_conf_point
+        - loss_reg_point
+        - loss_grad_point
     val:
       keys_to_log:
         - loss_objective
@@ -99,50 +171,41 @@ logging:
         - loss_T
         - loss_R
         - loss_FL
-        - loss_conf_depth
-        - loss_reg_depth
-        - loss_grad_depth
-
-
 
 checkpoint:
   save_dir: logs/${exp_name}/ckpts
-  save_freq: 5
-  resume_checkpoint_path: /YOUR/PATH/TO/CKPT
+  save_freq: 1
+  resume_checkpoint_path: null
   strict: False
-
 
 loss:
   _target_: loss.MultitaskLoss
-  camera: 
+  skip_missing_geometry_gt: True
+  camera:
     weight: 5.0
-    loss_type: "l1" # The paper uses smooth l1 loss, but we found l1 loss is more stable than smooth l1 and l2 loss.  
+    loss_type: l1
   depth:
     weight: 1.0
-    gradient_loss_fn: "grad" 
+    gradient_loss_fn: grad
     valid_range: 0.98
-  point: null
-  # If you want to enable point, use the following config
-  # point: 
-  #   weight: 1.0
-  #   gradient_loss_fn: "normal" 
-  #   valid_range: 0.98
-  track: null   
-
-
-
+  point:
+    weight: 1.0
+    gradient_loss_fn: normal
+    valid_range: 0.98
+  track: null
 
 optim:
   param_group_modifiers: False
-
   optimizer:
     _target_: torch.optim.AdamW
     lr: 5e-5
     weight_decay: 0.05
-
-  frozen_module_names:
-      - "*aggregator*"  # example, freeze the aggregator
-
+  frozen_module_names: []
+  # Phase-1 RF warmup examples if you want to freeze the RGB path:
+  # frozen_module_names:
+  #   - "aggregator.patch_embed"
+  #   - "aggregator.frame_blocks.@(0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21)"
+  #   - "aggregator.global_blocks.@(0|1|2|3|4|5|6|7|8|9|10|11|12|13|14|15|16|17|18|19|20|21)"
   amp:
     enabled: True
     amp_dtype: bfloat16
@@ -150,13 +213,13 @@ optim:
     _target_: train_utils.gradient_clip.GradientClipper
     configs:
       - module_name: ["aggregator"]
-        max_norm: 1.0   # feel free to reduce this if you see instabilities
+        max_norm: 1.0
         norm_type: 2
       - module_name: ["depth"]
-        max_norm: 1.0   # feel free to reduce this if you see instabilities
+        max_norm: 1.0
         norm_type: 2
       - module_name: ["camera"]
-        max_norm: 1.0   # feel free to reduce this if you see instabilities
+        max_norm: 1.0
         norm_type: 2
   options:
     lr:
@@ -170,26 +233,23 @@ optim:
               start_value: 5e-5
               end_value: 1e-8
           lengths: [0.05, 0.95]
-          interval_scaling: ['rescaled', 'rescaled']
+          interval_scaling: [rescaled, rescaled]
     weight_decay:
       - scheduler:
           _target_: fvcore.common.param_scheduler.ConstantParamScheduler
           value: 0.05
-
-
-
 
 max_epochs: 20
 
 model:
   _target_: vggt.models.vggt.VGGT
   enable_camera: True
-  enable_depth: True
-  enable_point: False
+  enable_depth: ${geometry.enable_depth}
+  enable_point: ${geometry.enable_point}
   enable_track: False
   aggregator_kwargs: null
-  enable_rf: False
-  rf_encoder_type: cnn
+  enable_rf: True
+  rf_encoder_type: hybrid_vit
   rf_in_chans: 8
   rf_encoder_hidden_dim: 256
   rf_latent_grid: [4, 8]
@@ -197,7 +257,7 @@ model:
   rf_fusion_num_heads: 8
   rf_fuse_special_tokens: True
   rf_fusion_scale_init: 1e-3
-  rf_drop_prob: 0.0
+  rf_drop_prob: 0.1
   use_raw_rf_paths: False
   rf_path_feature_dim: null
   rf_path_token_count: 16
@@ -206,18 +266,16 @@ model:
   rf_fusion_layers: pre
   rf_fusion_every_n_blocks: 0
 
-
 distributed:
-  # check https://docs.pytorch.org/docs/stable/generated/torch.nn.parallel.DistributedDataParallel.html for options
   backend: nccl
   comms_dtype: None
   find_unused_parameters: False
   timeout_mins: 30
-  gradient_as_bucket_view: True  # Less memory used
+  gradient_as_bucket_view: True
   bucket_cap_mb: 25
   broadcast_buffers: True
 
 cuda:
-    cudnn_deterministic: False
-    cudnn_benchmark: False
-    allow_tf32: True
+  cudnn_deterministic: False
+  cudnn_benchmark: False
+  allow_tf32: True

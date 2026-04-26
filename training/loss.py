@@ -9,8 +9,20 @@ import torch.nn.functional as F
 
 from dataclasses import dataclass
 from vggt.utils.pose_enc import extri_intri_to_pose_encoding
-from train_utils.general import check_and_fix_inf_nan
+try:
+    from train_utils.general import check_and_fix_inf_nan
+except ImportError:
+    def check_and_fix_inf_nan(tensor, name="", hard_max=1000):
+        if not torch.is_tensor(tensor):
+            return tensor
+        if hard_max is not None:
+            tensor = tensor.clamp(min=-hard_max, max=hard_max)
+        return torch.nan_to_num(tensor, nan=0.0, posinf=hard_max or 0.0, neginf=-(hard_max or 0.0))
 from math import ceil, floor
+try:
+    from losses.rf_consistency_losses import RFAngularConsistencyLoss, RFPathConsistencyLoss
+except ImportError:
+    from training.losses.rf_consistency_losses import RFAngularConsistencyLoss, RFPathConsistencyLoss
 
 
 @dataclass(eq=False)
@@ -24,13 +36,41 @@ class MultitaskLoss(torch.nn.Module):
     - Point loss
     - Tracking loss (not cleaned yet, dirty code is at the bottom of this file)
     """
-    def __init__(self, camera=None, depth=None, point=None, track=None, **kwargs):
+    def __init__(
+        self,
+        camera=None,
+        depth=None,
+        point=None,
+        track=None,
+        skip_missing_geometry_gt=False,
+        camera_weight=None,
+        depth_weight=None,
+        point_weight=None,
+        rf_angular_weight=0.0,
+        rf_path_weight=0.0,
+        rf_angular=None,
+        rf_path=None,
+        **kwargs,
+    ):
         super().__init__()
         # Loss configuration dictionaries for each task
         self.camera = camera
         self.depth = depth
         self.point = point
         self.track = track
+        self.skip_missing_geometry_gt = skip_missing_geometry_gt
+        self.camera_weight = float(camera_weight if camera_weight is not None else (camera or {}).get("weight", 1.0))
+        self.depth_weight = float(depth_weight if depth_weight is not None else (depth or {}).get("weight", 1.0))
+        self.point_weight = float(point_weight if point_weight is not None else (point or {}).get("weight", 1.0))
+        self.rf_angular_weight = float(rf_angular_weight)
+        self.rf_path_weight = float(rf_path_weight)
+
+        rf_angular_conf = dict(rf_angular or {})
+        rf_path_conf = dict(rf_path or {})
+        self.rf_angular_enabled = bool(rf_angular_conf.pop("enabled", self.rf_angular_weight > 0))
+        self.rf_path_enabled = bool(rf_path_conf.pop("enabled", self.rf_path_weight > 0))
+        self.rf_angular_loss = RFAngularConsistencyLoss(**rf_angular_conf) if self.rf_angular_enabled else None
+        self.rf_path_loss = RFPathConsistencyLoss(**rf_path_conf) if self.rf_path_enabled else None
 
     def forward(self, predictions, batch) -> torch.Tensor:
         """
@@ -43,36 +83,74 @@ class MultitaskLoss(torch.nn.Module):
         Returns:
             Dict containing individual losses and total objective
         """
-        total_loss = 0
+        ref_tensor = next(
+            (
+                value
+                for container in (predictions, batch)
+                for value in container.values()
+                if torch.is_tensor(value) and value.is_floating_point()
+            ),
+            None,
+        )
+        zero = ref_tensor.sum() * 0.0 if ref_tensor is not None else torch.tensor(0.0)
+        total_loss = zero
         loss_dict = {}
         
         # Camera pose loss - if pose encodings are predicted
-        if "pose_enc_list" in predictions:
+        if "pose_enc_list" in predictions and self.camera is not None:
             camera_loss_dict = compute_camera_loss(predictions, batch, **self.camera)   
-            camera_loss = camera_loss_dict["loss_camera"] * self.camera["weight"]   
+            camera_loss = camera_loss_dict["loss_camera"] * self.camera_weight
             total_loss = total_loss + camera_loss
             loss_dict.update(camera_loss_dict)
+        else:
+            loss_dict["loss_camera"] = zero
         
         # Depth estimation loss - if depth maps are predicted
-        if "depth" in predictions:
-            depth_loss_dict = compute_depth_loss(predictions, batch, **self.depth)
+        if "depth" in predictions and self.depth is not None:
+            depth_conf = dict(self.depth)
+            depth_conf.setdefault("skip_missing_geometry_gt", self.skip_missing_geometry_gt)
+            depth_loss_dict = compute_depth_loss(predictions, batch, **depth_conf)
             depth_loss = depth_loss_dict["loss_conf_depth"] + depth_loss_dict["loss_reg_depth"] + depth_loss_dict["loss_grad_depth"]
-            depth_loss = depth_loss * self.depth["weight"]
-            total_loss = total_loss + depth_loss
+            loss_dict["loss_depth"] = depth_loss
+            total_loss = total_loss + depth_loss * self.depth_weight
             loss_dict.update(depth_loss_dict)
+        else:
+            loss_dict["loss_depth"] = zero
 
         # 3D point reconstruction loss - if world points are predicted
-        if "world_points" in predictions:
-            point_loss_dict = compute_point_loss(predictions, batch, **self.point)
+        if "world_points" in predictions and self.point is not None:
+            point_conf = dict(self.point)
+            point_conf.setdefault("skip_missing_geometry_gt", self.skip_missing_geometry_gt)
+            point_loss_dict = compute_point_loss(predictions, batch, **point_conf)
             point_loss = point_loss_dict["loss_conf_point"] + point_loss_dict["loss_reg_point"] + point_loss_dict["loss_grad_point"]
-            point_loss = point_loss * self.point["weight"]
-            total_loss = total_loss + point_loss
+            loss_dict["loss_point"] = point_loss
+            total_loss = total_loss + point_loss * self.point_weight
             loss_dict.update(point_loss_dict)
+        else:
+            loss_dict["loss_point"] = zero
+
+        if self.rf_angular_loss is not None:
+            rf_angular_dict = self.rf_angular_loss(predictions, batch)
+            rf_angular = rf_angular_dict.get("loss_rf_angular", zero)
+            total_loss = total_loss + rf_angular * self.rf_angular_weight
+            loss_dict.update(rf_angular_dict)
+        else:
+            loss_dict["loss_rf_angular"] = zero
+
+        if self.rf_path_loss is not None:
+            rf_path_dict = self.rf_path_loss(predictions, batch)
+            rf_path = rf_path_dict.get("loss_rf_path", zero)
+            total_loss = total_loss + rf_path * self.rf_path_weight
+            loss_dict.update(rf_path_dict)
+        else:
+            loss_dict["loss_rf_path"] = zero
 
         # Tracking loss - not cleaned yet, dirty code is at the bottom of this file
         if "track" in predictions:
             raise NotImplementedError("Track loss is not cleaned up yet")
         
+        loss_dict["loss_total"] = total_loss
+        loss_dict["loss_objective"] = total_loss
         loss_dict["objective"] = total_loss
 
         return loss_dict
@@ -91,17 +169,23 @@ def compute_camera_loss(
 ):
     # List of predicted pose encodings per stage
     pred_pose_encodings = pred_dict['pose_enc_list']
-    # Binary mask for valid points per frame (B, N, H, W)
-    point_masks = batch_data['point_masks']
-    # Only consider frames with enough valid points (>100)
-    valid_frame_mask = point_masks[:, 0].sum(dim=[-1, -2]) > 100
     # Number of prediction stages
     n_stages = len(pred_pose_encodings)
 
     # Get ground truth camera extrinsics and intrinsics
+    if "extrinsics" not in batch_data or "intrinsics" not in batch_data or "images" not in batch_data:
+        raise KeyError("Camera loss requires batch keys 'images', 'extrinsics', and 'intrinsics'.")
     gt_extrinsics = batch_data['extrinsics']
     gt_intrinsics = batch_data['intrinsics']
     image_hw = batch_data['images'].shape[-2:]
+    device = gt_extrinsics.device
+    if "point_masks" in batch_data and batch_data["point_masks"] is not None:
+        # Binary mask for valid points per frame (B, N, H, W)
+        point_masks = batch_data['point_masks']
+        # Keep legacy behavior: a batch item is valid when its first frame has enough geometry.
+        valid_frame_mask = point_masks[:, 0].sum(dim=[-1, -2]) > 100
+    else:
+        valid_frame_mask = torch.ones(gt_extrinsics.shape[0], dtype=torch.bool, device=device)
 
     # Encode ground truth pose to match predicted encoding format
     gt_pose_encoding = extri_intri_to_pose_encoding(
@@ -196,7 +280,16 @@ def camera_loss_single(pred_pose_enc, gt_pose_enc, loss_type="l1"):
     return loss_T, loss_R, loss_FL
 
 
-def compute_point_loss(predictions, batch, gamma=1.0, alpha=0.2, gradient_loss_fn = None, valid_range=-1, **kwargs):
+def compute_point_loss(
+    predictions,
+    batch,
+    gamma=1.0,
+    alpha=0.2,
+    gradient_loss_fn=None,
+    valid_range=-1,
+    skip_missing_geometry_gt=False,
+    **kwargs,
+):
     """
     Compute point loss.
     
@@ -210,6 +303,17 @@ def compute_point_loss(predictions, batch, gamma=1.0, alpha=0.2, gradient_loss_f
     """
     pred_points = predictions['world_points']
     pred_points_conf = predictions['world_points_conf']
+    missing = [key for key in ("world_points", "point_masks") if key not in batch or batch[key] is None]
+    if missing:
+        if skip_missing_geometry_gt:
+            dummy_loss = (0.0 * pred_points).mean()
+            return {
+                "loss_conf_point": dummy_loss,
+                "loss_reg_point": dummy_loss,
+                "loss_grad_point": dummy_loss,
+            }
+        raise KeyError(f"Point loss requires geometry GT keys 'world_points' and 'point_masks'; missing {missing}")
+
     gt_points = batch['world_points']
     gt_points_mask = batch['point_masks']
     
@@ -236,7 +340,16 @@ def compute_point_loss(predictions, batch, gamma=1.0, alpha=0.2, gradient_loss_f
     return loss_dict
 
 
-def compute_depth_loss(predictions, batch, gamma=1.0, alpha=0.2, gradient_loss_fn = None, valid_range=-1, **kwargs):
+def compute_depth_loss(
+    predictions,
+    batch,
+    gamma=1.0,
+    alpha=0.2,
+    gradient_loss_fn=None,
+    valid_range=-1,
+    skip_missing_geometry_gt=False,
+    **kwargs,
+):
     """
     Compute depth loss.
     
@@ -250,11 +363,25 @@ def compute_depth_loss(predictions, batch, gamma=1.0, alpha=0.2, gradient_loss_f
     """
     pred_depth = predictions['depth']
     pred_depth_conf = predictions['depth_conf']
+    has_depth_mask = "depth_masks" in batch and batch["depth_masks"] is not None
+    has_point_mask = "point_masks" in batch and batch["point_masks"] is not None
+    missing = [key for key in ("depths",) if key not in batch or batch[key] is None]
+    if not has_depth_mask and not has_point_mask:
+        missing.append("depth_masks/point_masks")
+    if missing:
+        if skip_missing_geometry_gt:
+            dummy_loss = (0.0 * pred_depth).mean()
+            return {
+                "loss_conf_depth": dummy_loss,
+                "loss_reg_depth": dummy_loss,
+                "loss_grad_depth": dummy_loss,
+            }
+        raise KeyError(f"Depth loss requires geometry GT keys 'depths' and 'point_masks'; missing {missing}")
 
     gt_depth = batch['depths']
     gt_depth = check_and_fix_inf_nan(gt_depth, "gt_depth")
     gt_depth = gt_depth[..., None]              # (B, H, W, 1)
-    gt_depth_mask = batch['point_masks'].clone()   # 3D points derived from depth map, so we use the same mask
+    gt_depth_mask = (batch["depth_masks"] if has_depth_mask else batch["point_masks"]).clone()
 
     if gt_depth_mask.sum() < 100:
         # If there are less than 100 valid points, skip this batch
@@ -316,6 +443,8 @@ def regression_loss(pred, gt, mask, conf=None, gradient_loss_fn=None, gamma=1.0,
     loss_grad = 0
 
     # Prepare confidence for gradient loss if needed
+    gradient_loss_fn = gradient_loss_fn or ""
+
     if "conf" in gradient_loss_fn:
         to_feed_conf = conf.reshape(bb*ss, hh, ww)
     else:
@@ -805,5 +934,3 @@ def sequence_loss(flow_preds, flow_gt, vis, valids, gamma=0.8, vis_aware=False, 
 
     return flow_loss
 '''
-
-

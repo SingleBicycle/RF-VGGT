@@ -697,8 +697,9 @@ class Trainer:
         tensor_keys = [
             "images", "depths", "extrinsics", "intrinsics", 
             "cam_points", "world_points", "point_masks", "rf",
+            "rf_paths", "rf_path_mask", "rf_global", "depth_masks",
         ]        
-        string_keys = ["seq_name"]
+        string_keys = ["seq_name", "scene_root"]
         
         for key in tensor_keys:
             if key in batch:
@@ -716,6 +717,11 @@ class Trainer:
     def _process_batch(self, batch: Mapping):      
         if self.data_conf.train.common_config.repeat_batch:
             batch = self._apply_batch_repetition(batch)
+
+        geometry_keys = ("cam_points", "world_points", "depths", "point_masks")
+        has_all_geometry = all(key in batch and batch[key] is not None for key in geometry_keys)
+        if not has_all_geometry:
+            return batch
         
         # Normalize camera extrinsics and points. The function returns new tensors.
         normalized_extrinsics, normalized_cam_points, normalized_world_points, normalized_depths = \
@@ -743,13 +749,26 @@ class Trainer:
             A dictionary containing the computed losses.
         """
         # Forward pass
-        y_hat = model(images=batch["images"], rf=batch.get("rf"))
+        y_hat = model(
+            images=batch["images"],
+            rf=batch.get("rf"),
+            rf_paths=batch.get("rf_paths"),
+            rf_path_mask=batch.get("rf_path_mask"),
+            rf_global=batch.get("rf_global"),
+            query_points=batch.get("query_points"),
+        )
         
         # Loss computation
         loss_dict = self.loss(y_hat, batch)
         
         # Combine all data for logging
         log_data = {**y_hat, **loss_dict, **batch}
+        if isinstance(y_hat.get("rf_aux"), Mapping):
+            for key, value in y_hat["rf_aux"].items():
+                if torch.is_tensor(value) and value.numel() == 1:
+                    log_data[key] = value
+                elif not torch.is_tensor(value):
+                    log_data[key] = value
 
         self._update_and_log_scalars(log_data, phase, self.steps[phase], loss_meters)
         self._log_tb_visuals(log_data, phase, self.steps[phase])
@@ -760,7 +779,7 @@ class Trainer:
     def _update_and_log_scalars(self, data: Mapping, phase: str, step: int, loss_meters: dict):
         """Updates average meters and logs scalar values to TensorBoard."""
         keys_to_log = self._get_scalar_log_keys(phase)
-        batch_size = data['extrinsics'].shape[0]
+        batch_size = data['extrinsics'].shape[0] if 'extrinsics' in data else data['images'].shape[0]
         
         for key in keys_to_log:
             if key in data:

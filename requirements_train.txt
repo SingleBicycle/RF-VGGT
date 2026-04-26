@@ -1,0 +1,11 @@
+-r requirements.txt
+
+hydra-core
+omegaconf
+fvcore
+iopath
+wcmatch
+opencv-python
+tensorboard
+PyYAML
+matplotlib
