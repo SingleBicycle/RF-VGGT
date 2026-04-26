@@ -1,292 +1,280 @@
-> This fork contains RF-VGGT training code. For RF-specific setup, data format, and training commands, see [README_RF_VGGT.md](README_RF_VGGT.md).
+# RF-VGGT
 
-<div align="center">
-<h1>VGGT: Visual Geometry Grounded Transformer</h1>
+RF-VGGT extends VGGT with an RF-aware geometry conditioning pathway. RGB frames still go through the VGGT visual geometry backbone, while angular RF maps and raw RF multipath measurements are encoded into RF tokens, synchronized across frames, and injected into VGGT token reasoning through gated cross-attention adapters.
 
-<a href="https://jytime.github.io/data/VGGT_CVPR25.pdf" target="_blank" rel="noopener noreferrer">
-  <img src="https://img.shields.io/badge/Paper-VGGT" alt="Paper PDF">
-</a>
-<a href="https://arxiv.org/abs/2503.11651"><img src="https://img.shields.io/badge/arXiv-2503.11651-b31b1b" alt="arXiv"></a>
-<a href="https://vgg-t.github.io/"><img src="https://img.shields.io/badge/Project_Page-green" alt="Project Page"></a>
-<a href="https://huggingface.co/spaces/facebook/vggt"><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue'></a>
+The target training objective is:
 
-
-**[Visual Geometry Group, University of Oxford](https://www.robots.ox.ac.uk/~vgg/)**; **[Meta AI](https://ai.facebook.com/research/)**
-
-
-[Jianyuan Wang](https://jytime.github.io/), [Minghao Chen](https://silent-chen.github.io/), [Nikita Karaev](https://nikitakaraevv.github.io/), [Andrea Vedaldi](https://www.robots.ox.ac.uk/~vedaldi/), [Christian Rupprecht](https://chrirupp.github.io/), [David Novotny](https://d-novotny.github.io/)
-</div>
-
-```bibtex
-@inproceedings{wang2025vggt,
-  title={VGGT: Visual Geometry Grounded Transformer},
-  author={Wang, Jianyuan and Chen, Minghao and Karaev, Nikita and Vedaldi, Andrea and Rupprecht, Christian and Novotny, David},
-  booktitle={Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition},
-  year={2025}
-}
+```text
+L_total =
+    camera loss
+  + depth loss
+  + point loss
+  + RF angular consistency loss
+  + RF path consistency loss
 ```
 
-## Updates
+If the selected scenes do not provide depth / point ground truth and `skip_missing_geometry_gt: True`, the depth / point supervised terms become zero. In that case, training effectively uses camera supervision plus the RF consistency losses.
 
-- [July 29, 2025] We've updated the license for VGGT to permit **commercial use** (excluding military applications). All code in this repository is now under a commercial-use-friendly license. However, only the newly released checkpoint [**VGGT-1B-Commercial**](https://huggingface.co/facebook/VGGT-1B-Commercial) is licensed for commercial usage — the original checkpoint remains non-commercial. Full license details are available [here](https://github.com/facebookresearch/vggt/blob/main/LICENSE.txt). Access to the checkpoint requires completing an application form, which is processed by a system similar to LLaMA's approval workflow, automatically. The new checkpoint delivers similar performance to the original model. Please submit an issue if you notice a significant performance discrepancy.
+## What This Repo Adds
 
+- `vggt/models/rf_modules.py`: the final RF module stack.
+  - Angular RF encoder with separate dense / sparse / confidence stems.
+  - Circular azimuth padding to respect 0 / 360 degree continuity.
+  - Angular positional features.
+  - Raw RF path set encoder with masked attention, summary token, and range histogram token.
+  - RF global scalar token encoder.
+  - Cross-frame RF scene synchronization transformer.
+  - Token-type-aware gated RF adapter.
+- `training/data/datasets/rf_scene.py`: scene-local RGB + RF dataset.
+- `training/data/rf_utils.py`: RF `.npz` packing utilities.
+- `training/losses/rf_consistency_losses.py`: RF angular and RF path consistency losses.
+- `training/config/rf_vggt_final_full.yaml`: final full RF-VGGT training config.
+- `scripts/smoke_rf_vggt_final_full.py`: synthetic forward / loss / gradient smoke test.
 
+## Environment Setup
 
-- [July 6, 2025] Training code is now available in the `training` folder, including an example to finetune VGGT on a custom dataset. 
-
-
-- [June 13, 2025] Honored to receive the Best Paper Award at CVPR 2025! Apologies if I’m slow to respond to queries or GitHub issues these days. If you’re interested, our oral presentation is available [here](https://docs.google.com/presentation/d/1JVuPnuZx6RgAy-U5Ezobg73XpBi7FrOh/edit?usp=sharing&ouid=107115712143490405606&rtpof=true&sd=true). Another long presentation can be found [here](https://docs.google.com/presentation/d/1aSv0e5PmH1mnwn2MowlJIajFUYZkjqgw/edit?usp=sharing&ouid=107115712143490405606&rtpof=true&sd=true) (Note: it’s shared in .pptx format with animations — quite large, but feel free to use it as a template if helpful.)
-
-
-- [June 2, 2025] Added a script to run VGGT and save predictions in COLMAP format, with bundle adjustment support optional. The saved COLMAP files can be directly used with [gsplat](https://github.com/nerfstudio-project/gsplat) or other NeRF/Gaussian splatting libraries.
-
-
-- [May 3, 2025] Evaluation code for reproducing our camera pose estimation results on Co3D is now available in the [evaluation](https://github.com/facebookresearch/vggt/tree/evaluation) branch. 
-
-
-## Overview
-
-Visual Geometry Grounded Transformer (VGGT, CVPR 2025) is a feed-forward neural network that directly infers all key 3D attributes of a scene, including extrinsic and intrinsic camera parameters, point maps, depth maps, and 3D point tracks, **from one, a few, or hundreds of its views, within seconds**.
-
-
-## Quick Start
-
-First, clone this repository to your local machine, and install the dependencies (torch, torchvision, numpy, Pillow, and huggingface_hub). 
+Use Python 3.10 or newer. Install the CUDA build of PyTorch that matches your machine, then install the repo and training dependencies.
 
 ```bash
-git clone git@github.com:facebookresearch/vggt.git 
-cd vggt
-pip install -r requirements.txt
+cd /path/to/rf_vggt/vggt
+
+conda create -n rf-vggt python=3.10 -y
+conda activate rf-vggt
+pip install --upgrade pip
+
+# Example for CUDA 12.1. Use the PyTorch index URL that matches your CUDA stack.
+pip install torch==2.3.1 torchvision==0.18.1 --index-url https://download.pytorch.org/whl/cu121
+
+pip install -r requirements_train.txt
+pip install -e .
 ```
 
-Alternatively, you can install VGGT as a package (<a href="docs/package.md">click here</a> for details).
-
-
-Now, try the model with just a few lines of code:
-
-```python
-import torch
-from vggt.models.vggt import VGGT
-from vggt.utils.load_fn import load_and_preprocess_images
-
-device = "cuda" if torch.cuda.is_available() else "cpu"
-# bfloat16 is supported on Ampere GPUs (Compute Capability 8.0+) 
-dtype = torch.bfloat16 if torch.cuda.get_device_capability()[0] >= 8 else torch.float16
-
-# Initialize the model and load the pretrained weights.
-# This will automatically download the model weights the first time it's run, which may take a while.
-model = VGGT.from_pretrained("facebook/VGGT-1B").to(device)
-
-# Load and preprocess example images (replace with your own image paths)
-image_names = ["path/to/imageA.png", "path/to/imageB.png", "path/to/imageC.png"]  
-images = load_and_preprocess_images(image_names).to(device)
-
-with torch.no_grad():
-    with torch.cuda.amp.autocast(dtype=dtype):
-        # Predict attributes including cameras, depth maps, and point maps.
-        predictions = model(images)
-```
-
-The model weights will be automatically downloaded from Hugging Face. If you encounter issues such as slow loading, you can manually download them [here](https://huggingface.co/facebook/VGGT-1B/blob/main/model.pt) and load, or:
-
-```python
-model = VGGT()
-_URL = "https://huggingface.co/facebook/VGGT-1B/resolve/main/model.pt"
-model.load_state_dict(torch.hub.load_state_dict_from_url(_URL))
-```
-
-## Detailed Usage
-
-<details>
-<summary>Click to expand</summary>
-
-You can also optionally choose which attributes (branches) to predict, as shown below. This achieves the same result as the example above. This example uses a batch size of 1 (processing a single scene), but it naturally works for multiple scenes.
-
-```python
-from vggt.utils.pose_enc import pose_encoding_to_extri_intri
-from vggt.utils.geometry import unproject_depth_map_to_point_map
-
-with torch.no_grad():
-    with torch.cuda.amp.autocast(dtype=dtype):
-        images = images[None]  # add batch dimension
-        aggregated_tokens_list, ps_idx = model.aggregator(images)
-                
-    # Predict Cameras
-    pose_enc = model.camera_head(aggregated_tokens_list)[-1]
-    # Extrinsic and intrinsic matrices, following OpenCV convention (camera from world)
-    extrinsic, intrinsic = pose_encoding_to_extri_intri(pose_enc, images.shape[-2:])
-
-    # Predict Depth Maps
-    depth_map, depth_conf = model.depth_head(aggregated_tokens_list, images, ps_idx)
-
-    # Predict Point Maps
-    point_map, point_conf = model.point_head(aggregated_tokens_list, images, ps_idx)
-        
-    # Construct 3D Points from Depth Maps and Cameras
-    # which usually leads to more accurate 3D points than point map branch
-    point_map_by_unprojection = unproject_depth_map_to_point_map(depth_map.squeeze(0), 
-                                                                extrinsic.squeeze(0), 
-                                                                intrinsic.squeeze(0))
-
-    # Predict Tracks
-    # choose your own points to track, with shape (N, 2) for one scene
-    query_points = torch.FloatTensor([[100.0, 200.0], 
-                                        [60.72, 259.94]]).to(device)
-    track_list, vis_score, conf_score = model.track_head(aggregated_tokens_list, images, ps_idx, query_points=query_points[None])
-```
-
-
-Furthermore, if certain pixels in the input frames are unwanted (e.g., reflective surfaces, sky, or water), you can simply mask them by setting the corresponding pixel values to 0 or 1. Precise segmentation masks aren't necessary - simple bounding box masks work effectively (check this [issue](https://github.com/facebookresearch/vggt/issues/47) for an example).
-
-</details>
-
-
-## Interactive Demo
-
-We provide multiple ways to visualize your 3D reconstructions. Before using these visualization tools, install the required dependencies:
+After the environment is installed, run the smoke test:
 
 ```bash
-pip install -r requirements_demo.txt
+python scripts/smoke_rf_vggt_final_full.py --device cuda
 ```
 
-### Interactive 3D Visualization
+`--device cpu` is only useful for a very small code-path check. Real training is intended to run on GPUs.
 
-**Please note:** VGGT typically reconstructs a scene in less than 1 second. However, visualizing 3D points may take tens of seconds due to third-party rendering, independent of VGGT's processing time. The visualization is slow especially when the number of images is large.
+## Training Data Format
 
+`RFSceneDataset` accepts `rf_scene_roots` in three forms:
 
-#### Gradio Web Interface
+- a directory containing multiple scene folders;
+- a single scene folder;
+- a text file with one scene path per line.
 
-Our Gradio-based interface allows you to upload images/videos, run reconstruction, and interactively explore the 3D scene in your browser. You can launch this in your local machine or try it on [Hugging Face](https://huggingface.co/spaces/facebook/vggt).
+Recommended layout:
 
+```text
+/path/to/RF_SCENES/
+  AI53_001/
+    cameras.npz
+    images/
+      000000.png
+      000001.png
+    rf_angular_images_gaussian/
+      npz/
+        000000.npz
+        000001.npz
+    rf/
+      000000.npz
+      000001.npz
+    depths/              optional
+      000000.npy
+    world_points/        optional
+      000000.npy
+    point_masks/         optional
+      000000.npy
+    depth_masks/         optional
+      000000.npy
+```
+
+`cameras.npz` must contain:
+
+```text
+images:      [N] relative image paths, e.g. images/000000.png
+extrinsics:  [N, 3, 4] or [N, 4, 4], OpenCV camera-from-world convention
+intrinsics:  [N, 3, 3]
+image_size:  [2] optional, [width, height]
+```
+
+Angular RF is read from `rf_angular_images_gaussian/npz` by default. Each frame `.npz` should contain:
+
+```text
+angular_image:        [90, 360, 3]
+sparse_angular_image: [90, 360, 3]
+mask_map:             [90, 360]
+count_map:            [90, 360]
+```
+
+The loader packs these into:
+
+```text
+rf: [S, 8, 90, 360]
+```
+
+The 8 channels are:
+
+```text
+0:3 dense angular RF
+3:6 sparse angular RF
+6   mask map
+7   log1p(count map)
+```
+
+Raw RF paths are read from `rf/` by default. Each frame `.npz` should contain:
+
+```text
+cir_coefficients
+cir_delays
+path_loss_db
+total_path_gain
+per_path_gain_db
+pdp_power
+aoa
+aod
+num_paths
+frequency_hz
+max_depth
+```
+
+The loader packs raw RF into:
+
+```text
+rf_paths:     [S, K, 17]
+rf_path_mask: [S, K]
+rf_global:    [S, 7]
+```
+
+The default `K` is 64 and is controlled by `raw_rf_top_k`.
+
+## Training
+
+The trainer uses PyTorch DDP, so launch with `torchrun` even for a single GPU. The wrapper script defaults to one local process and accepts Hydra overrides after the script name.
+
+Start with a small debug run:
 
 ```bash
-python demo_gradio.py
+cd /path/to/rf_vggt/vggt
+
+RF_SCENE_ROOTS=/path/to/RF_SCENES \
+NPROC_PER_NODE=1 \
+bash scripts/train_rf_vggt_final_full.sh \
+  max_epochs=1 \
+  limit_train_batches=2 \
+  limit_val_batches=1 \
+  num_workers=0 \
+  max_img_per_gpu=1 \
+  'data.train.common_config.img_nums=[1,2]' \
+  'data.val.common_config.img_nums=[1,2]' \
+  logging.log_dir=logs/debug_rf_vggt
 ```
 
-<details>
-<summary>Click to preview the Gradio interactive interface</summary>
-
-![Gradio Web Interface Preview](https://jytime.github.io/data/vggt_hf_demo_screen.png)
-</details>
-
-
-#### Viser 3D Viewer
-
-Run the following command to run reconstruction and visualize the point clouds in viser. Note this script requires a path to a folder containing images. It assumes only image files under the folder. You can set `--use_point_map` to use the point cloud from the point map branch, instead of the depth-based point cloud.
+Full multi-GPU fine-tuning:
 
 ```bash
-python demo_viser.py --image_folder path/to/your/images/folder
+RF_SCENE_ROOTS=/path/to/RF_SCENES \
+NPROC_PER_NODE=4 \
+bash scripts/train_rf_vggt_final_full.sh \
+  checkpoint.resume_checkpoint_path=/path/to/pretrained_vggt_checkpoint.pt \
+  logging.log_dir=logs/rf_vggt_final_full \
+  max_epochs=20 \
+  max_img_per_gpu=4
 ```
 
-## Exporting to COLMAP Format
+`checkpoint.strict` defaults to `False`, so an RGB-only VGGT checkpoint can be loaded while the newly added RF modules are initialized from scratch.
 
-We also support exporting VGGT's predictions directly to COLMAP format, by:
+Logs and checkpoints:
 
-```bash 
-# Feedforward prediction only
-python demo_colmap.py --scene_dir=/YOUR/SCENE_DIR/ 
-
-# With bundle adjustment
-python demo_colmap.py --scene_dir=/YOUR/SCENE_DIR/ --use_ba
-
-# Run with bundle adjustment using reduced parameters for faster processing
-# Reduces max_query_pts from 4096 (default) to 2048 and query_frame_num from 8 (default) to 5
-# Trade-off: Faster execution but potentially less robust reconstruction in complex scenes (you may consider setting query_frame_num equal to your total number of images) 
-# See demo_colmap.py for additional bundle adjustment configuration options
-python demo_colmap.py --scene_dir=/YOUR/SCENE_DIR/ --use_ba --max_query_pts=2048 --query_frame_num=5
+```text
+logs/rf_vggt_final_full/
+logs/rf_vggt_final_full/ckpts/
+logs/rf_vggt_final_full/tensorboard/
 ```
 
-Please ensure that the images are stored in `/YOUR/SCENE_DIR/images/`. This folder should contain only the images. Check the examples folder for the desired data structure. 
+TensorBoard:
 
-The reconstruction result (camera parameters and 3D points) will be automatically saved under `/YOUR/SCENE_DIR/sparse/` in the COLMAP format, such as:
-
-``` 
-SCENE_DIR/
-├── images/
-└── sparse/
-    ├── cameras.bin
-    ├── images.bin
-    └── points3D.bin
+```bash
+tensorboard --logdir logs
 ```
 
-## Integration with Gaussian Splatting
+## Key Configs
 
+Main config:
 
-The exported COLMAP files can be directly used with [gsplat](https://github.com/nerfstudio-project/gsplat) for Gaussian Splatting training. Install `gsplat` following their official instructions (we recommend `gsplat==1.3.0`):
-
-An example command to train the model is:
-```
-cd gsplat
-python examples/simple_trainer.py  default --data_factor 1 --data_dir /YOUR/SCENE_DIR/ --result_dir /YOUR/RESULT_DIR/
+```text
+training/config/rf_vggt_final_full.yaml
 ```
 
+Important fields:
 
+```yaml
+rf_scene_roots: /path/to/RF_SCENES
+img_size: 336
+max_img_per_gpu: 4
+geometry:
+  enable_depth: True
+  enable_point: True
+loss:
+  camera_weight: 1.0
+  depth_weight: 0.5
+  point_weight: 0.5
+  rf_angular_weight: 0.05
+  rf_path_weight: 0.02
+  skip_missing_geometry_gt: True
+model:
+  use_rf: True
+  rf:
+    encoder_type: final_v2
+    use_angular: True
+    use_paths: True
+    use_global: True
+```
 
-## Zero-shot Single-view Reconstruction
+If the current data has no depth / point GT, keep `skip_missing_geometry_gt: True` and keep at least one geometry prediction head enabled. The RF consistency losses need predicted geometry: they use `world_points` from the point head when available, or backproject the depth head output using intrinsics.
 
-Our model shows surprisingly good performance on single-view reconstruction, although it was never trained for this task. The model does not need to duplicate the single-view image to a pair, instead, it can directly infer the 3D structure from the tokens of the single view image. Feel free to try it with our demos above, which naturally works for single-view reconstruction.
+If memory is tight and there is no point GT, you can disable the point head while keeping the depth head:
 
+```bash
+bash scripts/train_rf_vggt_final_full.sh \
+  geometry.enable_point=False \
+  model.enable_point=False \
+  loss.point_weight=0.0 \
+  data.train.common_config.load_world_points=False \
+  data.train.common_config.load_point_masks=False \
+  data.val.common_config.load_world_points=False \
+  data.val.common_config.load_point_masks=False
+```
 
-We did not quantitatively test monocular depth estimation performance ourselves, but [@kabouzeid](https://github.com/kabouzeid) generously provided a comparison of VGGT to recent methods [here](https://github.com/facebookresearch/vggt/issues/36). VGGT shows competitive or better results compared to state-of-the-art monocular approaches such as DepthAnything v2 or MoGe, despite never being explicitly trained for single-view tasks. 
+The older, lighter RF few-shot config is:
 
+```text
+training/config/rf_fewshot_final.yaml
+```
 
+That config uses the previous hybrid RF encoder path and disables raw RF paths by default.
 
-## Runtime and GPU Memory
+## Can We Start Training Now?
 
-We benchmark the runtime and GPU memory usage of VGGT's aggregator on a single NVIDIA H100 GPU across various input sizes. 
+You can start with debug training once the Python environment is installed and `scripts/smoke_rf_vggt_final_full.py` passes.
 
-| **Input Frames** | 1 | 2 | 4 | 8 | 10 | 20 | 50 | 100 | 200 |
-|:----------------:|:-:|:-:|:-:|:-:|:--:|:--:|:--:|:---:|:---:|
-| **Time (s)**     | 0.04 | 0.05 | 0.07 | 0.11 | 0.14 | 0.31 | 1.04 | 3.12 | 8.75 |
-| **Memory (GB)**  | 1.88 | 2.07 | 2.45 | 3.23 | 3.63 | 5.58 | 11.41 | 21.15 | 40.63 |
+In this local workspace, the sample data under `dataset/AI53_001_new` currently has:
 
-Note that these results were obtained using Flash Attention 3, which is faster than the default Flash Attention 2 implementation while maintaining almost the same memory usage. Feel free to compile Flash Attention 3 from source to get better performance.
+```text
+100 RGB images
+99 angular RF frames
+98 raw RF frames
+0 depth / point GT folders detected
+```
 
+This is enough for camera + RF consistency fine-tuning. It is not enough to exercise the full supervised depth / point terms until `depths/`, `world_points/`, and the corresponding masks are added.
 
-## Research Progression
+## Common Failure Modes
 
-Our work builds upon a series of previous research projects. If you're interested in understanding how our research evolved, check out our previous works:
-
-
-<table border="0" cellspacing="0" cellpadding="0">
-  <tr>
-    <td align="left">
-      <a href="https://github.com/jytime/Deep-SfM-Revisited">Deep SfM Revisited</a>
-    </td>
-    <td style="white-space: pre;">──┐</td>
-    <td></td>
-  </tr>
-  <tr>
-    <td align="left">
-      <a href="https://github.com/facebookresearch/PoseDiffusion">PoseDiffusion</a>
-    </td>
-    <td style="white-space: pre;">─────►</td>
-    <td>
-      <a href="https://github.com/facebookresearch/vggsfm">VGGSfM</a> ──►
-      <a href="https://github.com/facebookresearch/vggt">VGGT</a>
-    </td>
-  </tr>
-  <tr>
-    <td align="left">
-      <a href="https://github.com/facebookresearch/co-tracker">CoTracker</a>
-    </td>
-    <td style="white-space: pre;">──┘</td>
-    <td></td>
-  </tr>
-</table>
-
-
-## Acknowledgements
-
-Thanks to these great repositories: [PoseDiffusion](https://github.com/facebookresearch/PoseDiffusion), [VGGSfM](https://github.com/facebookresearch/vggsfm), [CoTracker](https://github.com/facebookresearch/co-tracker), [DINOv2](https://github.com/facebookresearch/dinov2), [Dust3r](https://github.com/naver/dust3r), [Moge](https://github.com/microsoft/moge), [PyTorch3D](https://github.com/facebookresearch/pytorch3d), [Sky Segmentation](https://github.com/xiongzhu666/Sky-Segmentation-and-Post-processing), [Depth Anything V2](https://github.com/DepthAnything/Depth-Anything-V2), [Metric3D](https://github.com/YvanYin/Metric3D) and many other inspiring works in the community.
-
-## Checklist
-
-- [x] Release the training code
-- [ ] Release VGGT-500M and VGGT-200M
-
-
-## License
-See the [LICENSE](./LICENSE.txt) file for details about the license under which this code is made available.
-
-Please note that only this [model checkpoint](https://huggingface.co/facebook/VGGT-1B-Commercial) allows commercial usage. This new checkpoint achieves the same performance level (might be slightly better) as the original one, e.g., AUC@30: 90.37 vs. 89.98 on the Co3D dataset.
+- `ModuleNotFoundError: torch`: PyTorch is not installed, or the conda environment is not activated.
+- `Please set the RANK and LOCAL_RANK environment variables`: training was launched with plain `python`; use `torchrun`.
+- `No RF scenes have valid frames after RF filtering`: the path is wrong, or the frame IDs do not overlap across images, angular RF, and raw RF.
+- `Missing RF key(s)`: check the angular RF `.npz` keys and shapes.
+- CUDA OOM: reduce `max_img_per_gpu`, reduce `data.*.common_config.img_nums`, or increase `accum_steps`.
