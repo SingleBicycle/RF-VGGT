@@ -172,6 +172,11 @@ logging:
         - loss_point
         - loss_rf_angular
         - loss_rf_path
+        - loss_rf_scale
+        - rf_scale_factor_mean
+        - rf_scale_abs_err
+        - rf_pred_scale_m
+        - rf_gt_scale_m
         - loss_T
         - loss_R
         - loss_FL
@@ -200,6 +205,9 @@ logging:
         - loss_point
         - loss_rf_angular
         - loss_rf_path
+        - loss_rf_scale
+        - rf_scale_factor_mean
+        - rf_scale_abs_err
         - rf_adapter_gate_mean
         - rf_adapter_gate_camera_mean
         - rf_adapter_gate_patch_mean
@@ -217,7 +225,8 @@ loss:
   depth_weight: 0.5
   point_weight: 0.5
   rf_angular_weight: 0.05
-  rf_path_weight: 0.02
+  rf_path_weight: 0.05
+  rf_scale_weight: 1.0
   skip_missing_geometry_gt: True
   camera:
     weight: 1.0
@@ -245,10 +254,11 @@ loss:
     path_amplitude_index: null
     delay_to_meter: 1.0
     range_min: 0.0
-    range_max: 20.0
+    range_max: 50.0
     range_bins: 64
-    hist_sigma: 0.15
+    hist_sigma: 0.5
     max_points_per_view: 4096
+    range_to_depth_scale: 0.37
   track: null
 
 optim:
@@ -346,15 +356,15 @@ model:
       late_adapter: True
       token_type_gating: True
       use_rf_confidence_bias: True
-      fusion_scale_init: 0.0
-      gate_bias_init: -2.0
+      fusion_scale_init: 0.05
+      gate_bias_init: 0.0
       dropout: 0.1
       rf_fuse_special_tokens: True
 
 distributed:
   backend: nccl
   comms_dtype: None
-  find_unused_parameters: False
+  find_unused_parameters: True
   timeout_mins: 30
   gradient_as_bucket_view: True
   bucket_cap_mb: 25

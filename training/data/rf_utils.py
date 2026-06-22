@@ -9,6 +9,23 @@ import numpy as np
 ANGULAR_RF_SHAPE = (90, 360)
 RAW_RF_PATH_FEATURE_DIM = 17
 RAW_RF_GLOBAL_FEATURE_DIM = 7
+
+SPEED_OF_LIGHT = 299792458.0
+# dB window for log-compressing raw-linear angular RF power into a [0,1]-ish map.
+# Raw angular power spans ~1e-21..1e-7 (W); without this it underflows next to mask/count.
+RF_POWER_FLOOR_DB = -200.0
+RF_POWER_CEIL_DB = -50.0
+
+
+def _log_power_to_unit(x: np.ndarray, floor_db: float = RF_POWER_FLOOR_DB, ceil_db: float = RF_POWER_CEIL_DB) -> np.ndarray:
+    """Log-compress raw linear RF power -> [0,1] via dB, preserving spatial structure.
+
+    Zero/near-zero power maps to 0; the brightest multipath returns map toward 1.
+    """
+    x = np.asarray(x, dtype=np.float32)
+    db = 10.0 * np.log10(np.maximum(x, 0.0) + 1e-30)
+    out = (db - floor_db) / (ceil_db - floor_db)
+    return np.clip(out, 0.0, 1.0).astype(np.float32)
 RF_DENSE_SLICE = slice(0, 3)
 RF_SPARSE_SLICE = slice(3, 6)
 RF_MASK_INDEX = 6
@@ -106,8 +123,10 @@ def pack_angular_rf_npz(
                 npz_path,
                 ("angular_image", "sparse_angular_image", "mask_map", "count_map"),
             )
-            dense = _sanitize_float32(data["angular_image"])
-            sparse = _sanitize_float32(data["sparse_angular_image"])
+            # Log-compress raw-linear power so the dense/sparse channels are not crushed to ~0
+            # (they span ~1e-21..1e-7 W; mask/count are O(1), so raw values vanish under norm).
+            dense = _log_power_to_unit(_sanitize_float32(data["angular_image"]))
+            sparse = _log_power_to_unit(_sanitize_float32(data["sparse_angular_image"]))
             mask = _sanitize_float32(data["mask_map"])[..., None]
             count = np.log1p(np.maximum(_sanitize_float32(data["count_map"]), 0.0))[..., None].astype(np.float32)
 
@@ -155,7 +174,7 @@ def pack_raw_rf_npz(
     npz_path: Path,
     top_k: int = 64,
     sort_by: str = "pdp_power",
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Pack variable-length raw RF paths into padded path and global features.
 
@@ -163,6 +182,8 @@ def pack_raw_rf_npz(
       path_features: [K, 17] float32
       path_mask: [K] bool
       global_features: [7] float32
+      range_m: [K] float32  -- metric bistatic path length per selected path = c * cir_delay
+      los_range_m: scalar float32 -- line-of-sight (first-arrival) range = c * min(cir_delay) = |tx - rx|
     """
     npz_path = Path(npz_path)
     if not npz_path.is_file():
@@ -174,6 +195,8 @@ def pack_raw_rf_npz(
 
     features = np.zeros((top_k, RAW_RF_PATH_FEATURE_DIM), dtype=np.float32)
     mask = np.zeros((top_k,), dtype=bool)
+    range_m = np.zeros((top_k,), dtype=np.float32)
+    los_range_m = np.float32(0.0)
 
     with np.load(npz_path) as data:
         declared_num_paths = int(_as_scalar(data, "num_paths", 0.0))
@@ -196,9 +219,13 @@ def pack_raw_rf_npz(
         global_features = _sanitize_float32(global_features)
 
         if num_paths == 0:
-            return features, mask, global_features
+            return features, mask, global_features, range_m, los_range_m
 
         cir_delays = _sanitize_float32(_as_1d(data, "cir_delays", npz_path, num_paths)[:num_paths])
+        # Line-of-sight (first-arrival) metric range = c * min(delay) = |tx - rx| (bistatic, exact).
+        positive_delays = cir_delays[cir_delays > 0]
+        if positive_delays.size > 0:
+            los_range_m = np.float32(SPEED_OF_LIGHT * positive_delays.min())
         pdp_power = _sanitize_float32(_as_1d(data, "pdp_power", npz_path, num_paths)[:num_paths])
         per_path_gain_db = _sanitize_float32(_as_1d(data, "per_path_gain_db", npz_path, num_paths)[:num_paths])
 
@@ -214,7 +241,7 @@ def pack_raw_rf_npz(
         score = pdp_power if sort_by == "pdp_power" else per_path_gain_db
         valid = np.isfinite(score)
         if not valid.any():
-            return features, mask, global_features
+            return features, mask, global_features, range_m, los_range_m
 
         sorted_valid = np.where(valid)[0][np.argsort(score[valid])[::-1]]
         selected = sorted_valid[:top_k]
@@ -252,4 +279,6 @@ def pack_raw_rf_npz(
 
         features[:out_n] = _sanitize_float32(path_features)
         mask[:out_n] = True
-        return features, mask, global_features
+        # Metric bistatic path length per selected path (meters), aligned with `features`/`mask`.
+        range_m[:out_n] = _sanitize_float32(SPEED_OF_LIGHT * cir_delays[selected])
+        return features, mask, global_features, range_m, los_range_m

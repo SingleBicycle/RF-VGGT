@@ -48,6 +48,7 @@ class MultitaskLoss(torch.nn.Module):
         point_weight=None,
         rf_angular_weight=0.0,
         rf_path_weight=0.0,
+        rf_scale_weight=0.0,
         rf_angular=None,
         rf_path=None,
         **kwargs,
@@ -64,6 +65,8 @@ class MultitaskLoss(torch.nn.Module):
         self.point_weight = float(point_weight if point_weight is not None else (point or {}).get("weight", 1.0))
         self.rf_angular_weight = float(rf_angular_weight)
         self.rf_path_weight = float(rf_path_weight)
+        # Weight on the RF metric-scale anchor (Huber(predicted log_scale, log GT metric_scale)).
+        self.rf_scale_weight = float(rf_scale_weight)
 
         rf_angular_conf = dict(rf_angular or {})
         rf_path_conf = dict(rf_path or {})
@@ -144,6 +147,26 @@ class MultitaskLoss(torch.nn.Module):
             loss_dict.update(rf_path_dict)
         else:
             loss_dict["loss_rf_path"] = zero
+
+        # RF metric-scale anchor: tie the RF-predicted log scale to the GT metric scale.
+        # This is the decisive term: only a model that reads RF can satisfy it per-sample, so
+        # it injects the absolute metric scale that image-only feed-forward reconstruction lacks.
+        if "rf_log_scale" in predictions and predictions["rf_log_scale"] is not None \
+                and "metric_scale" in batch and batch["metric_scale"] is not None:
+            pred_log_scale = predictions["rf_log_scale"].float().reshape(-1)
+            metric_scale = batch["metric_scale"].to(pred_log_scale.device).float().reshape(-1).clamp_min(1e-6)
+            target_log_scale = torch.log(metric_scale)
+            loss_scale = F.smooth_l1_loss(pred_log_scale, target_log_scale)
+            total_loss = total_loss + loss_scale * self.rf_scale_weight
+            # scale-factor diagnostics (==1.0 means perfect metric recovery)
+            scale_factor = torch.exp(pred_log_scale - target_log_scale)
+            loss_dict["loss_rf_scale"] = loss_scale
+            loss_dict["rf_scale_factor_mean"] = scale_factor.mean().detach()
+            loss_dict["rf_scale_abs_err"] = (scale_factor - 1.0).abs().mean().detach()
+            loss_dict["rf_pred_scale_m"] = torch.exp(pred_log_scale).mean().detach()
+            loss_dict["rf_gt_scale_m"] = metric_scale.mean().detach()
+        else:
+            loss_dict["loss_rf_scale"] = zero
 
         # Tracking loss - not cleaned yet, dirty code is at the bottom of this file
         if "track" in predictions:

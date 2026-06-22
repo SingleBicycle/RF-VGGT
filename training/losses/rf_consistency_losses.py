@@ -255,11 +255,12 @@ class RFPathConsistencyLoss(nn.Module):
         path_amplitude_index: Optional[int] = None,
         delay_to_meter: float = 1.0,
         range_min: float = 0.0,
-        range_max: float = 20.0,
+        range_max: float = 50.0,
         range_bins: int = 64,
-        hist_sigma: float = 0.15,
+        hist_sigma: float = 0.5,
         max_points_per_view: int = 4096,
         pose_source: str = "gt_first",
+        range_to_depth_scale: float = 0.37,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -272,18 +273,23 @@ class RFPathConsistencyLoss(nn.Module):
         self.hist_sigma = float(hist_sigma)
         self.max_points_per_view = int(max_points_per_view)
         self.pose_source = pose_source
+        # RF multipath ranges are bistatic path lengths (~2.7x one-way camera depth);
+        # this calibration maps RF range -> comparable camera-depth range so the histograms align.
+        self.range_to_depth_scale = float(range_to_depth_scale)
 
-    def _pred_hist(self, points: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    def _pred_hist(self, points: torch.Tensor, mask: torch.Tensor, frame_scale: torch.Tensor) -> torch.Tensor:
         B, S, H, W, _ = points.shape
         flat_points = points.reshape(B * S, H * W, 3)
         flat_mask = mask.reshape(B * S, H * W)
+        flat_scale = frame_scale.reshape(B * S)
         hists = []
         for frame_idx in range(B * S):
             pts = _select_valid_points(flat_points[frame_idx], flat_mask[frame_idx], self.max_points_per_view)
             if pts.numel() == 0:
                 hists.append(points.new_zeros(self.range_bins))
                 continue
-            ranges = torch.linalg.norm(pts, dim=-1)
+            # Predicted point ranges in METERS = unit-scale range * predicted metric scale.
+            ranges = torch.linalg.norm(pts, dim=-1) * flat_scale[frame_idx]
             weights = torch.ones_like(ranges)
             hists.append(
                 build_range_histogram(
@@ -297,17 +303,13 @@ class RFPathConsistencyLoss(nn.Module):
             )
         return torch.stack(hists, dim=0).reshape(B, S, self.range_bins)
 
-    def _target_hist(self, rf_paths: torch.Tensor, rf_path_mask: torch.Tensor) -> torch.Tensor:
-        delay = rf_paths[..., self.path_delay_index].float().clamp_min(0.0) * self.delay_to_meter
-        valid = rf_path_mask.to(device=rf_paths.device, dtype=delay.dtype)
-        weight = valid
-        if self.path_amplitude_index is not None and self.path_amplitude_index < rf_paths.shape[-1]:
-            amp = rf_paths[..., self.path_amplitude_index].float().abs()
-            amp = amp / amp.amax(dim=-1, keepdim=True).clamp_min(1e-6)
-            weight = weight * amp
-        B, S, K = delay.shape
+    def _target_hist_from_ranges(self, range_m: torch.Tensor, rf_path_mask: torch.Tensor) -> torch.Tensor:
+        # range_m [B,S,K] are metric bistatic path lengths; calibrate to comparable camera depth.
+        ranges = range_m.float().clamp_min(0.0) * self.range_to_depth_scale
+        weight = rf_path_mask.to(device=range_m.device, dtype=ranges.dtype)
+        B, S, K = ranges.shape
         return build_range_histogram(
-            delay.reshape(B * S, K),
+            ranges.reshape(B * S, K),
             weight.reshape(B * S, K),
             self.range_min,
             self.range_max,
@@ -317,15 +319,24 @@ class RFPathConsistencyLoss(nn.Module):
 
     def forward(self, predictions: Dict[str, torch.Tensor], batch: Dict[str, torch.Tensor]) -> Dict[str, torch.Tensor]:
         zero = _zero_from_predictions(predictions, batch)
-        if "rf_paths" not in batch or batch["rf_paths"] is None or "rf_path_mask" not in batch or batch["rf_path_mask"] is None:
+        if "rf_path_range_m" not in batch or batch["rf_path_range_m"] is None \
+                or "rf_path_mask" not in batch or batch["rf_path_mask"] is None:
             return {"loss_rf_path": zero}
         points, mask, status = get_pred_points_for_rf_loss(predictions, batch, pose_source=self.pose_source)
         if points is None or mask is None:
             return {"loss_rf_path": zero, status: zero + 1.0}
 
-        pred_hist = self._pred_hist(points, mask)
-        target_hist = self._target_hist(
-            batch["rf_paths"].to(device=points.device, dtype=points.dtype),
+        B, S = points.shape[:2]
+        # Per-frame predicted metric scale: use RF-predicted log_scale if available, else align
+        # the predicted range median to the (calibrated) RF range median so the loss is scale-consistent.
+        if "rf_log_scale" in predictions and predictions["rf_log_scale"] is not None:
+            frame_scale = torch.exp(predictions["rf_log_scale"].float().detach()).reshape(B, 1).expand(B, S)
+        else:
+            frame_scale = points.new_ones(B, S)
+
+        pred_hist = self._pred_hist(points, mask, frame_scale)
+        target_hist = self._target_hist_from_ranges(
+            batch["rf_path_range_m"].to(device=points.device, dtype=points.dtype),
             batch["rf_path_mask"].to(device=points.device),
         )
         l1 = F.smooth_l1_loss(pred_hist, target_hist)

@@ -724,7 +724,7 @@ class Trainer:
             return batch
         
         # Normalize camera extrinsics and points. The function returns new tensors.
-        normalized_extrinsics, normalized_cam_points, normalized_world_points, normalized_depths = \
+        normalized_extrinsics, normalized_cam_points, normalized_world_points, normalized_depths, metric_scale = \
             normalize_camera_extrinsics_and_points_batch(
                 extrinsics=batch["extrinsics"],
                 cam_points=batch["cam_points"],
@@ -738,6 +738,9 @@ class Trainer:
         batch["cam_points"] = normalized_cam_points
         batch["world_points"] = normalized_world_points
         batch["depths"] = normalized_depths
+        # Per-sample GT metric scale [B] (meters): the absolute scale the RF anchor must recover.
+        # GT geometry above is unit-normalized (scale-free), so RF is the only source of this scalar.
+        batch["metric_scale"] = metric_scale
 
         return batch
 

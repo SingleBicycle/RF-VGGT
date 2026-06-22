@@ -1,0 +1,472 @@
+{
+  "config": {
+    "method": "rf_off",
+    "modality": "full",
+    "angular_encoder": "final_v2",
+    "mode": "partial",
+    "unfreeze_last": 4,
+    "steps": 2500,
+    "frames": 3,
+    "lr": 0.0002,
+    "seed": 42,
+    "tag": "A_rfoff_partial_s42",
+    "eval_controls": false,
+    "device": "cuda:0"
+  },
+  "history": [
+    {
+      "step": 0,
+      "loss_total": 1.4284645318984985,
+      "loss_depth": 1.1259106397628784,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 50,
+      "loss_total": 0.5384282469749451,
+      "loss_depth": 0.3198571801185608,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 100,
+      "loss_total": 0.6022583842277527,
+      "loss_depth": 0.17572984099388123,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 150,
+      "loss_total": 0.46946656703948975,
+      "loss_depth": 0.1808721125125885,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 200,
+      "loss_total": 0.25558674335479736,
+      "loss_depth": -0.04141826555132866,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 250,
+      "loss_total": 0.26456308364868164,
+      "loss_depth": 0.08343943953514099,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 300,
+      "loss_total": 1.0415654182434082,
+      "loss_depth": 0.16173607110977173,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 350,
+      "loss_total": 0.3045880198478699,
+      "loss_depth": 0.18118275701999664,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 400,
+      "loss_total": 0.28998079895973206,
+      "loss_depth": 0.07650917768478394,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 450,
+      "loss_total": 0.5788168907165527,
+      "loss_depth": 0.4092952609062195,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 500,
+      "loss_total": 1.5733668804168701,
+      "loss_depth": 0.3130740523338318,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 550,
+      "loss_total": 0.046400364488363266,
+      "loss_depth": -0.12236987054347992,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 600,
+      "loss_total": 0.054215479642152786,
+      "loss_depth": -0.13195562362670898,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 650,
+      "loss_total": 0.34235477447509766,
+      "loss_depth": 0.11663131415843964,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 700,
+      "loss_total": 1.732112169265747,
+      "loss_depth": 0.002617970108985901,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 750,
+      "loss_total": 0.09510115534067154,
+      "loss_depth": -0.07847270369529724,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 800,
+      "loss_total": 0.1683843731880188,
+      "loss_depth": -0.02806602418422699,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 850,
+      "loss_total": 0.2815145254135132,
+      "loss_depth": 0.16588300466537476,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 900,
+      "loss_total": 0.14860332012176514,
+      "loss_depth": -0.021029578521847725,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 950,
+      "loss_total": 0.10723861306905746,
+      "loss_depth": -0.0759177878499031,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1000,
+      "loss_total": 0.37293386459350586,
+      "loss_depth": 0.21523690223693848,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1050,
+      "loss_total": 0.06831768155097961,
+      "loss_depth": -0.08289031684398651,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1100,
+      "loss_total": 0.2718800902366638,
+      "loss_depth": 0.06156185641884804,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1150,
+      "loss_total": 0.16678813099861145,
+      "loss_depth": -0.017734535038471222,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1200,
+      "loss_total": 0.09779854863882065,
+      "loss_depth": -0.10042683035135269,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1250,
+      "loss_total": 0.08487941324710846,
+      "loss_depth": -0.06077609211206436,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1300,
+      "loss_total": 0.10973106324672699,
+      "loss_depth": 0.021756036207079887,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1350,
+      "loss_total": 0.18957486748695374,
+      "loss_depth": -0.0016294308006763458,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1400,
+      "loss_total": 0.006060692481696606,
+      "loss_depth": -0.1361282467842102,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1450,
+      "loss_total": 0.05714287981390953,
+      "loss_depth": -0.11420503258705139,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1500,
+      "loss_total": 0.3209352195262909,
+      "loss_depth": 0.10706557333469391,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1550,
+      "loss_total": 0.08247218281030655,
+      "loss_depth": -0.12500111758708954,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1600,
+      "loss_total": 0.3525165617465973,
+      "loss_depth": 0.16597875952720642,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1650,
+      "loss_total": 0.0962507575750351,
+      "loss_depth": -0.031704653054475784,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1700,
+      "loss_total": 0.07155004888772964,
+      "loss_depth": -0.09318001568317413,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1750,
+      "loss_total": 0.9110875129699707,
+      "loss_depth": 0.33288848400115967,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1800,
+      "loss_total": 0.13190609216690063,
+      "loss_depth": -0.0217483751475811,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1850,
+      "loss_total": 0.06534676998853683,
+      "loss_depth": -0.05234534293413162,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1900,
+      "loss_total": 0.3166641891002655,
+      "loss_depth": 0.050875402987003326,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 1950,
+      "loss_total": 0.18846026062965393,
+      "loss_depth": 0.043472811579704285,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 2000,
+      "loss_total": 0.16171275079250336,
+      "loss_depth": 0.012192346155643463,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 2050,
+      "loss_total": 0.2976970076560974,
+      "loss_depth": 0.076798215508461,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 2100,
+      "loss_total": 0.03286469727754593,
+      "loss_depth": -0.017247626557946205,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 2150,
+      "loss_total": 0.16939939558506012,
+      "loss_depth": 0.02744213491678238,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 2200,
+      "loss_total": 0.11210557073354721,
+      "loss_depth": -0.029003888368606567,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 2250,
+      "loss_total": 0.137780100107193,
+      "loss_depth": -0.015044759958982468,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 2300,
+      "loss_total": 0.1428598016500473,
+      "loss_depth": -0.02453518658876419,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 2350,
+      "loss_total": 0.09406306594610214,
+      "loss_depth": -0.06466878205537796,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 2400,
+      "loss_total": 0.2187545746564865,
+      "loss_depth": 0.029396474361419678,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 2450,
+      "loss_total": 0.09531957656145096,
+      "loss_depth": -0.033285729587078094,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    },
+    {
+      "step": 2499,
+      "loss_total": 0.13990889489650726,
+      "loss_depth": -0.006263133138418198,
+      "loss_rf_scale": 0.0,
+      "scale_factor": NaN,
+      "gate": NaN
+    }
+  ],
+  "const_scale": 8.326964419364929,
+  "eval": {
+    "n": 132,
+    "absrel_sd_mean": 0.7794879212824987,
+    "absrel_sd_std": 0.4693350261342242,
+    "absrel_si_mean": 0.11229625616617726,
+    "absrel_si_std": 0.057721762544861006,
+    "recovery_mean": 1.6518447047065352,
+    "recovery_std": 0.455015125007172,
+    "scale_factor_med": 1.6302251815795898,
+    "per_scene": {
+      "AI53_017_Blender": {
+        "n": 33,
+        "absrel_sd": 1.1220269871480537,
+        "absrel_si": 0.12068795183240764,
+        "recovery_mean": 1.917082110376784,
+        "recovery_std": 0.3782223250695872,
+        "scale_factor": 2.1024985313415527
+      },
+      "AI53_018_Blender": {
+        "n": 33,
+        "absrel_sd": 0.3028549281033603,
+        "absrel_si": 0.17348652393227876,
+        "recovery_mean": 1.1431313394225973,
+        "recovery_std": 0.1890528588137344,
+        "scale_factor": 1.1354703903198242
+      },
+      "AI53_019_Blender": {
+        "n": 33,
+        "absrel_sd": 0.6492619407598418,
+        "absrel_si": 0.10768258157703611,
+        "recovery_mean": 1.5699618524921501,
+        "recovery_std": 0.23925904186018568,
+        "scale_factor": 1.5555061101913452
+      },
+      "AI53_020_Blender": {
+        "n": 33,
+        "absrel_sd": 1.0438078291187383,
+        "absrel_si": 0.04732796732298653,
+        "recovery_mean": 1.977203516534609,
+        "recovery_std": 0.38783208855958934,
+        "scale_factor": 2.004426956176758
+      }
+    }
+  },
+  "wall_sec": 5847.681664466858
+}
