@@ -1,0 +1,25 @@
+{
+  "recovery_mean": 1.0418710708618164,
+  "recovery_mean_std": 0.010865659274071786,
+  "recovery_window_std": 0.25314756234486896,
+  "abs_log_err": 0.18576926489671072,
+  "mae_m": 1.042623480161031,
+  "per_scene": {
+    "AI53_017_Blender": {
+      "recovery_mean": 1.3245863914489746,
+      "recovery_std": 0.21505047380924225
+    },
+    "AI53_018_Blender": {
+      "recovery_mean": 0.7709079384803772,
+      "recovery_std": 0.09126652777194977
+    },
+    "AI53_019_Blender": {
+      "recovery_mean": 1.0021967887878418,
+      "recovery_std": 0.09583095461130142
+    },
+    "AI53_020_Blender": {
+      "recovery_mean": 1.114112377166748,
+      "recovery_std": 0.14652997255325317
+    }
+  }
+}

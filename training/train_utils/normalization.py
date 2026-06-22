@@ -110,7 +110,7 @@ def normalize_camera_extrinsics_and_points_batch(
         if cam_points is not None:
             new_cam_points = new_cam_points / avg_scale.view(-1, 1, 1, 1, 1)
     else:
-        return new_extrinsics[:, :, :3], cam_points, new_world_points, depths
+        return new_extrinsics[:, :, :3], cam_points, new_world_points, depths, torch.ones(B, device=device)
 
     new_extrinsics = new_extrinsics[:, :, :3] # 4x4 -> 3x4
     new_extrinsics = check_and_fix_inf_nan(new_extrinsics, "new_extrinsics", hard_max=None)
@@ -119,7 +119,9 @@ def normalize_camera_extrinsics_and_points_batch(
     new_depths = check_and_fix_inf_nan(new_depths, "new_depths", hard_max=None)
 
 
-    return new_extrinsics, new_cam_points, new_world_points, new_depths
+    # avg_scale [B] is the per-sample GT metric scale factor (mean world-point distance, meters).
+    # Returned so the RF metric-scale anchor loss can target it.
+    return new_extrinsics, new_cam_points, new_world_points, new_depths, avg_scale
 
 
 

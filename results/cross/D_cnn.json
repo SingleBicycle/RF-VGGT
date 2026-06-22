@@ -1,0 +1,360 @@
+{
+  "config": {
+    "method": "rf_on",
+    "modality": "full",
+    "angular_encoder": "cnn",
+    "mode": "frozen",
+    "unfreeze_last": 4,
+    "steps": 1800,
+    "frames": 3,
+    "lr": 0.0002,
+    "seed": 42,
+    "tag": "D_cnn",
+    "eval_controls": false,
+    "device": "cuda:0"
+  },
+  "history": [
+    {
+      "step": 0,
+      "loss_total": 3.901838779449463,
+      "loss_depth": 1.1170167922973633,
+      "loss_rf_scale": 2.45005464553833,
+      "scale_factor": 0.05233684554696083,
+      "gate": NaN
+    },
+    {
+      "step": 50,
+      "loss_total": 0.771862268447876,
+      "loss_depth": 0.4619951546192169,
+      "loss_rf_scale": 0.16986115276813507,
+      "scale_factor": 0.5583010315895081,
+      "gate": NaN
+    },
+    {
+      "step": 100,
+      "loss_total": 0.7119749784469604,
+      "loss_depth": 0.15390229225158691,
+      "loss_rf_scale": 0.3357417583465576,
+      "scale_factor": 0.4406779408454895,
+      "gate": NaN
+    },
+    {
+      "step": 150,
+      "loss_total": 0.2603692412376404,
+      "loss_depth": 0.046700380742549896,
+      "loss_rf_scale": 0.005638280883431435,
+      "scale_factor": 0.8992527723312378,
+      "gate": NaN
+    },
+    {
+      "step": 200,
+      "loss_total": 0.2603606581687927,
+      "loss_depth": -0.03898227959871292,
+      "loss_rf_scale": 0.02168545499444008,
+      "scale_factor": 0.8119984865188599,
+      "gate": NaN
+    },
+    {
+      "step": 250,
+      "loss_total": 0.7885746955871582,
+      "loss_depth": 0.5652356743812561,
+      "loss_rf_scale": 0.1951497346162796,
+      "scale_factor": 1.867759346961975,
+      "gate": NaN
+    },
+    {
+      "step": 300,
+      "loss_total": 0.8116986751556396,
+      "loss_depth": 0.19959546625614166,
+      "loss_rf_scale": 0.26105496287345886,
+      "scale_factor": 2.059723377227783,
+      "gate": NaN
+    },
+    {
+      "step": 350,
+      "loss_total": 0.2938755750656128,
+      "loss_depth": 0.05267857015132904,
+      "loss_rf_scale": 0.10368046164512634,
+      "scale_factor": 1.576755166053772,
+      "gate": NaN
+    },
+    {
+      "step": 400,
+      "loss_total": 0.43948084115982056,
+      "loss_depth": 0.24618001282215118,
+      "loss_rf_scale": 0.03656679764389992,
+      "scale_factor": 0.7630496025085449,
+      "gate": NaN
+    },
+    {
+      "step": 450,
+      "loss_total": 0.6141707897186279,
+      "loss_depth": 0.440244197845459,
+      "loss_rf_scale": 0.017339907586574554,
+      "scale_factor": 0.8300867080688477,
+      "gate": NaN
+    },
+    {
+      "step": 500,
+      "loss_total": 0.6789793968200684,
+      "loss_depth": 0.03839880973100662,
+      "loss_rf_scale": 4.663891672862519e-08,
+      "scale_factor": 0.9996947050094604,
+      "gate": NaN
+    },
+    {
+      "step": 550,
+      "loss_total": 0.6367745399475098,
+      "loss_depth": 0.13668832182884216,
+      "loss_rf_scale": 0.4084152579307556,
+      "scale_factor": 2.4689347743988037,
+      "gate": NaN
+    },
+    {
+      "step": 600,
+      "loss_total": 0.13846871256828308,
+      "loss_depth": -0.11842804402112961,
+      "loss_rf_scale": 0.07581469416618347,
+      "scale_factor": 0.6774657964706421,
+      "gate": NaN
+    },
+    {
+      "step": 650,
+      "loss_total": 0.3430476486682892,
+      "loss_depth": 0.010746411979198456,
+      "loss_rf_scale": 0.030572373420000076,
+      "scale_factor": 1.2805306911468506,
+      "gate": NaN
+    },
+    {
+      "step": 700,
+      "loss_total": 0.2296745479106903,
+      "loss_depth": 0.01568043977022171,
+      "loss_rf_scale": 0.04566078633069992,
+      "scale_factor": 1.3528244495391846,
+      "gate": NaN
+    },
+    {
+      "step": 750,
+      "loss_total": 0.1639174520969391,
+      "loss_depth": -0.04259031265974045,
+      "loss_rf_scale": 0.015160559676587582,
+      "scale_factor": 0.8401880264282227,
+      "gate": NaN
+    },
+    {
+      "step": 800,
+      "loss_total": 0.30349400639533997,
+      "loss_depth": -0.006713457405567169,
+      "loss_rf_scale": 0.11072012037038803,
+      "scale_factor": 0.6246433854103088,
+      "gate": NaN
+    },
+    {
+      "step": 850,
+      "loss_total": 0.27183765172958374,
+      "loss_depth": -0.08314787596464157,
+      "loss_rf_scale": 0.0014464497799053788,
+      "scale_factor": 0.9476352334022522,
+      "gate": NaN
+    },
+    {
+      "step": 900,
+      "loss_total": 0.29997628927230835,
+      "loss_depth": 0.07944012433290482,
+      "loss_rf_scale": 8.488025923725218e-05,
+      "scale_factor": 1.0131144523620605,
+      "gate": NaN
+    },
+    {
+      "step": 950,
+      "loss_total": 0.35128456354141235,
+      "loss_depth": 0.12081930786371231,
+      "loss_rf_scale": 0.04274298995733261,
+      "scale_factor": 0.7464849352836609,
+      "gate": NaN
+    },
+    {
+      "step": 1000,
+      "loss_total": 0.3024338185787201,
+      "loss_depth": 0.05939679592847824,
+      "loss_rf_scale": 0.029432114213705063,
+      "scale_factor": 0.7845699787139893,
+      "gate": NaN
+    },
+    {
+      "step": 1050,
+      "loss_total": 0.311097115278244,
+      "loss_depth": 0.04420757666230202,
+      "loss_rf_scale": 0.10161631554365158,
+      "scale_factor": 0.6371098160743713,
+      "gate": NaN
+    },
+    {
+      "step": 1100,
+      "loss_total": 0.39422571659088135,
+      "loss_depth": 0.23753789067268372,
+      "loss_rf_scale": 0.00451503973454237,
+      "scale_factor": 0.9093486666679382,
+      "gate": NaN
+    },
+    {
+      "step": 1150,
+      "loss_total": 0.5043259859085083,
+      "loss_depth": 0.4013826549053192,
+      "loss_rf_scale": 0.09489530324935913,
+      "scale_factor": 0.6468443274497986,
+      "gate": NaN
+    },
+    {
+      "step": 1200,
+      "loss_total": 0.1720293164253235,
+      "loss_depth": -0.041074514389038086,
+      "loss_rf_scale": 0.01070776954293251,
+      "scale_factor": 1.1575902700424194,
+      "gate": NaN
+    },
+    {
+      "step": 1250,
+      "loss_total": 0.12968309223651886,
+      "loss_depth": -0.08175265789031982,
+      "loss_rf_scale": 0.00024950451916083694,
+      "scale_factor": 1.022589921951294,
+      "gate": NaN
+    },
+    {
+      "step": 1300,
+      "loss_total": 0.3806111216545105,
+      "loss_depth": -0.110139861702919,
+      "loss_rf_scale": 0.21031855046749115,
+      "scale_factor": 0.5227952599525452,
+      "gate": NaN
+    },
+    {
+      "step": 1350,
+      "loss_total": 0.1725369691848755,
+      "loss_depth": -0.06983977556228638,
+      "loss_rf_scale": 0.009586945176124573,
+      "scale_factor": 1.148514986038208,
+      "gate": NaN
+    },
+    {
+      "step": 1400,
+      "loss_total": 0.3210706114768982,
+      "loss_depth": 0.039565637707710266,
+      "loss_rf_scale": 0.044827595353126526,
+      "scale_factor": 1.349082589149475,
+      "gate": NaN
+    },
+    {
+      "step": 1450,
+      "loss_total": 0.3179504871368408,
+      "loss_depth": 0.20824529230594635,
+      "loss_rf_scale": 0.004720077384263277,
+      "scale_factor": 0.9074103832244873,
+      "gate": NaN
+    },
+    {
+      "step": 1500,
+      "loss_total": 0.33668309450149536,
+      "loss_depth": -0.08323873579502106,
+      "loss_rf_scale": 0.08450739830732346,
+      "scale_factor": 1.5084974765777588,
+      "gate": NaN
+    },
+    {
+      "step": 1550,
+      "loss_total": 0.005924717523157597,
+      "loss_depth": -0.16260699927806854,
+      "loss_rf_scale": 0.00506939459592104,
+      "scale_factor": 1.1059354543685913,
+      "gate": NaN
+    },
+    {
+      "step": 1600,
+      "loss_total": 0.20444342494010925,
+      "loss_depth": -0.05219815671443939,
+      "loss_rf_scale": 0.03134460374712944,
+      "scale_factor": 0.7785063982009888,
+      "gate": NaN
+    },
+    {
+      "step": 1650,
+      "loss_total": 0.2351541370153427,
+      "loss_depth": -0.07275454699993134,
+      "loss_rf_scale": 0.09850788116455078,
+      "scale_factor": 0.6415522694587708,
+      "gate": NaN
+    },
+    {
+      "step": 1700,
+      "loss_total": 0.05814411863684654,
+      "loss_depth": -0.12942489981651306,
+      "loss_rf_scale": 0.030177012085914612,
+      "scale_factor": 1.2784783840179443,
+      "gate": NaN
+    },
+    {
+      "step": 1750,
+      "loss_total": 0.6366351246833801,
+      "loss_depth": 0.09679707884788513,
+      "loss_rf_scale": 0.003845112631097436,
+      "scale_factor": 1.0916539430618286,
+      "gate": NaN
+    },
+    {
+      "step": 1799,
+      "loss_total": 0.07267443835735321,
+      "loss_depth": -0.07412626594305038,
+      "loss_rf_scale": 0.0024718232452869415,
+      "scale_factor": 0.9321038126945496,
+      "gate": NaN
+    }
+  ],
+  "const_scale": 8.312811377578312,
+  "eval": {
+    "n": 132,
+    "absrel_sd_mean": 0.5787733572187146,
+    "absrel_sd_std": 0.34016204607105555,
+    "absrel_si_mean": 0.08067421231776327,
+    "absrel_si_std": 0.03716561069761344,
+    "recovery_mean": 1.557770988002272,
+    "recovery_std": 0.33060215020189204,
+    "scale_factor_med": 1.5741119384765625,
+    "per_scene": {
+      "AI53_017_Blender": {
+        "n": 33,
+        "absrel_sd": 0.6887449710959136,
+        "absrel_si": 0.07132221139365374,
+        "recovery_mean": 1.6640315505822667,
+        "recovery_std": 0.4058219015987562,
+        "scale_factor": 1.7263948917388916
+      },
+      "AI53_018_Blender": {
+        "n": 33,
+        "absrel_sd": 0.7216578985404488,
+        "absrel_si": 0.13478633680503174,
+        "recovery_mean": 1.6827488659111862,
+        "recovery_std": 0.28125277936919935,
+        "scale_factor": 1.729527235031128
+      },
+      "AI53_019_Blender": {
+        "n": 33,
+        "absrel_sd": 0.42201041814052703,
+        "absrel_si": 0.05919719925808786,
+        "recovery_mean": 1.4007113029901825,
+        "recovery_std": 0.2332070966382731,
+        "scale_factor": 1.3819060325622559
+      },
+      "AI53_020_Blender": {
+        "n": 33,
+        "absrel_sd": 0.4826801410979696,
+        "absrel_si": 0.05739110181427965,
+        "recovery_mean": 1.4835922325254538,
+        "recovery_std": 0.2862342147320193,
+        "scale_factor": 1.5074093341827393
+      }
+    }
+  },
+  "wall_sec": 3196.0203337669373
+}

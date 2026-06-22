@@ -9,6 +9,7 @@ import torch.nn as nn
 from huggingface_hub import PyTorchModelHubMixin  # used for model hub
 
 from vggt.models.aggregator import Aggregator
+from vggt.models.rf_modules import RFScaleHead
 from vggt.heads.camera_head import CameraHead
 from vggt.heads.dpt_head import DPTHead
 from vggt.heads.track_head import TrackHead
@@ -113,6 +114,14 @@ class VGGT(nn.Module, PyTorchModelHubMixin):
         self.depth_head = DPTHead(dim_in=2 * embed_dim, output_dim=2, activation="exp", conf_activation="expp1") if enable_depth else None
         self.track_head = TrackHead(dim_in=2 * embed_dim, patch_size=patch_size) if enable_track else None
 
+        # RF-only metric-scale head: predicts log absolute scale from RF paths/global (no images).
+        # Resolves the metric-scale ambiguity that image-only feed-forward reconstruction cannot.
+        self.rf_scale_head = (
+            RFScaleHead(path_dim=int(rf_path_feature_dim or 17), global_dim=int(rf_global_feature_dim or 7))
+            if enable_rf
+            else None
+        )
+
     def forward(
         self,
         images: torch.Tensor,
@@ -178,6 +187,11 @@ class VGGT(nn.Module, PyTorchModelHubMixin):
         )
 
         predictions = {"rf_aux": getattr(self.aggregator, "latest_rf_aux", {})}
+
+        # RF-only metric-scale prediction (feed-forward). Absent when RF is not provided (RF-off),
+        # which is exactly the point: without RF there is no per-sample metric-scale mechanism.
+        if self.rf_scale_head is not None and rf_paths is not None:
+            predictions["rf_log_scale"] = self.rf_scale_head(rf_paths, rf_path_mask, rf_global)
 
         with torch.cuda.amp.autocast(enabled=False):
             if self.camera_head is not None:

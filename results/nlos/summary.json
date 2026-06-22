@@ -1,0 +1,97 @@
+{
+  "baseline": {
+    "recovery": 1.0593397617340088,
+    "recovery_std": 0.036186135154321286,
+    "abs_log_err": 0.20748625695705414
+  },
+  "los_occlusion": [
+    {
+      "paths_removed": 1,
+      "recovery": 1.0608456929524739,
+      "recovery_std": 0.036428529060130534,
+      "abs_log_err": 0.20841983457406363
+    },
+    {
+      "paths_removed": 2,
+      "recovery": 1.0623859961827595,
+      "recovery_std": 0.03301174226796014,
+      "abs_log_err": 0.20973981420199075
+    },
+    {
+      "paths_removed": 3,
+      "recovery": 1.0715712706247966,
+      "recovery_std": 0.03168660274435282,
+      "abs_log_err": 0.21194960673650107
+    },
+    {
+      "paths_removed": 5,
+      "recovery": 1.0908434788386028,
+      "recovery_std": 0.026986232351783223,
+      "abs_log_err": 0.21687694390614828
+    },
+    {
+      "paths_removed": 8,
+      "recovery": 1.1291699409484863,
+      "recovery_std": 0.045371156576565944,
+      "abs_log_err": 0.22499984006086984
+    }
+  ],
+  "delay_noise": [
+    {
+      "sigma": 0.0,
+      "recovery": 1.0593397617340088,
+      "recovery_std": 0.036186135154321286,
+      "abs_log_err": 0.20748625695705414
+    },
+    {
+      "sigma": 0.05,
+      "recovery": 1.0461938381195068,
+      "recovery_std": 0.03175093751549815,
+      "abs_log_err": 0.2048880010843277
+    },
+    {
+      "sigma": 0.1,
+      "recovery": 1.0239287813504536,
+      "recovery_std": 0.037625801507197305,
+      "abs_log_err": 0.21076863507429758
+    },
+    {
+      "sigma": 0.2,
+      "recovery": 0.9633683164914449,
+      "recovery_std": 0.03576880803284541,
+      "abs_log_err": 0.22774597009023032
+    },
+    {
+      "sigma": 0.4,
+      "recovery": 0.8184805313746134,
+      "recovery_std": 0.07049136436648544,
+      "abs_log_err": 0.3021186093489329
+    }
+  ],
+  "path_dropout": [
+    {
+      "drop_frac": 0.0,
+      "recovery": 1.0593397617340088,
+      "recovery_std": 0.036186135154321286,
+      "abs_log_err": 0.20748625695705414
+    },
+    {
+      "drop_frac": 0.25,
+      "recovery": 1.1011073191960652,
+      "recovery_std": 0.04062841183818113,
+      "abs_log_err": 0.20925059914588928
+    },
+    {
+      "drop_frac": 0.5,
+      "recovery": 1.1710681915283203,
+      "recovery_std": 0.04553500749427709,
+      "abs_log_err": 0.23194500307242075
+    },
+    {
+      "drop_frac": 0.75,
+      "recovery": 1.3844371636708577,
+      "recovery_std": 0.04078979951369747,
+      "abs_log_err": 0.350265105565389
+    }
+  ]
+}

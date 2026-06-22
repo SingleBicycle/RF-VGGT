@@ -156,3 +156,8 @@ skyseg.onnx
 # pixi environments
 .pixi
 *.egg-info
+
+# RF-VGGT cross-scene: large regenerable caches / superseded arrays
+results/rf_only/cache_*.npz
+results/rf_only/image_feats.npz
+results/ab/arrays_*.npz

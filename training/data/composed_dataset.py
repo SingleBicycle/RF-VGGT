@@ -178,11 +178,13 @@ class ComposedDataset(Dataset, ABC):
         path_features = []
         path_masks = []
         global_features = []
+        range_meters = []
+        los_ranges = []
         for frame_id in ids.tolist():
             rf_path = resolved_scene_root / self.raw_rf_subdir / f"{int(frame_id):06d}.npz"
             if not rf_path.is_file() and self.allow_missing_raw_rf:
                 return None
-            features, mask, global_feat = pack_raw_rf_npz(
+            features, mask, global_feat, range_m, los_range_m = pack_raw_rf_npz(
                 rf_path,
                 top_k=self.raw_rf_top_k,
                 sort_by=self.raw_rf_sort_by,
@@ -190,11 +192,15 @@ class ComposedDataset(Dataset, ABC):
             path_features.append(features)
             path_masks.append(mask)
             global_features.append(global_feat)
+            range_meters.append(range_m)
+            los_ranges.append(los_range_m)
 
         return {
             "rf_paths": np.stack(path_features),
             "rf_path_mask": np.stack(path_masks),
             "rf_global": np.stack(global_features),
+            "rf_path_range_m": np.stack(range_meters),
+            "rf_los_range_m": np.asarray(los_ranges, dtype=np.float32),
         }
 
     def _stack_optional_tensor(self, batch: dict, key: str, dtype=np.float32):
@@ -294,6 +300,8 @@ class ComposedDataset(Dataset, ABC):
                 "rf_paths": batch.get("rf_paths"),
                 "rf_path_mask": batch.get("rf_path_mask"),
                 "rf_global": batch.get("rf_global"),
+                "rf_path_range_m": batch.get("rf_path_range_m"),
+                "rf_los_range_m": batch.get("rf_los_range_m"),
             }
             if raw_rf_batch["rf_paths"] is None or raw_rf_batch["rf_path_mask"] is None or raw_rf_batch["rf_global"] is None:
                 loaded_raw = self._load_raw_rf_sequence_from_disk(seq_name, ids, scene_root=scene_root)
@@ -303,10 +311,16 @@ class ComposedDataset(Dataset, ABC):
             rf_paths = _convert_optional_sequence_to_tensor(raw_rf_batch.get("rf_paths"), dtype=torch.get_default_dtype())
             rf_path_mask = _convert_optional_sequence_to_tensor(raw_rf_batch.get("rf_path_mask"), dtype=torch.bool)
             rf_global = _convert_optional_sequence_to_tensor(raw_rf_batch.get("rf_global"), dtype=torch.get_default_dtype())
+            rf_path_range_m = _convert_optional_sequence_to_tensor(raw_rf_batch.get("rf_path_range_m"), dtype=torch.get_default_dtype())
+            rf_los_range_m = _convert_optional_sequence_to_tensor(raw_rf_batch.get("rf_los_range_m"), dtype=torch.get_default_dtype())
             if rf_paths is not None and rf_path_mask is not None and rf_global is not None:
                 sample["rf_paths"] = rf_paths
                 sample["rf_path_mask"] = rf_path_mask
                 sample["rf_global"] = rf_global
+                if rf_path_range_m is not None:
+                    sample["rf_path_range_m"] = rf_path_range_m
+                if rf_los_range_m is not None:
+                    sample["rf_los_range_m"] = rf_los_range_m
 
         # --- Track Processing (if enabled) ---
         if self.load_track:

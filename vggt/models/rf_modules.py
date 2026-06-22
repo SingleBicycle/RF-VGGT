@@ -904,3 +904,56 @@ class RFGatedAdapterV2(nn.Module):
                 "adapter_gate_patch_mean": mean_or_zero(patch_mask).detach(),
             }
         return out
+
+
+class RFScaleHead(nn.Module):
+    """Predict per-sample log metric scale from RF measurements ONLY (no image features).
+
+    Rationale: RF per-path delays encode absolute metric range (range = c * delay), so the
+    absolute scene scale is recoverable from RF alone. Keeping this head blind to images is
+    deliberate: it makes the metric-scale prediction attributable to RF, so an RGB-only
+    (RF-off) model has no mechanism to recover per-sample metric scale.
+
+    Input:
+        rf_paths      [B, S, K, F]  packed per-path features (feature 0 encodes delay)
+        rf_path_mask  [B, S, K]     bool/float validity of each path
+        rf_global     [B, S, G]     per-frame global RF scalars
+    Output:
+        log_scale     [B]           predicted log of the metric scale factor
+    """
+
+    def __init__(self, path_dim: int = 17, global_dim: int = 7, hidden: int = 256):
+        super().__init__()
+        self.path_mlp = nn.Sequential(
+            nn.Linear(path_dim, hidden), nn.GELU(), nn.Linear(hidden, hidden)
+        )
+        self.global_mlp = nn.Sequential(
+            nn.Linear(global_dim, hidden), nn.GELU(), nn.Linear(hidden, hidden)
+        )
+        self.head = nn.Sequential(
+            nn.LayerNorm(2 * hidden), nn.Linear(2 * hidden, hidden), nn.GELU(), nn.Linear(hidden, 1)
+        )
+        # Initialized so the head starts near log_scale ~= 0 (scale ~= 1) and learns the offset.
+        self.log_scale_bias = nn.Parameter(torch.zeros(1))
+
+    def forward(self, rf_paths, rf_path_mask=None, rf_global=None):
+        if rf_paths.dim() == 3:  # [S, K, F] -> [1, S, K, F]
+            rf_paths = rf_paths.unsqueeze(0)
+        B, S, K, _ = rf_paths.shape
+        if rf_path_mask is None:
+            m = rf_paths.new_ones(B, S, K, 1)
+        else:
+            if rf_path_mask.dim() == 2:
+                rf_path_mask = rf_path_mask.unsqueeze(0)
+            m = rf_path_mask.to(rf_paths.dtype).unsqueeze(-1)
+        pf = self.path_mlp(rf_paths.float())                 # [B,S,K,H]
+        pf = (pf * m).sum(dim=2) / m.sum(dim=2).clamp_min(1.0)  # masked mean over paths -> [B,S,H]
+        if rf_global is None:
+            gf = pf.new_zeros(B, S, pf.shape[-1])
+        else:
+            if rf_global.dim() == 2:
+                rf_global = rf_global.unsqueeze(0)
+            gf = self.global_mlp(rf_global.float())          # [B,S,H]
+        feat = torch.cat([pf, gf], dim=-1)                   # [B,S,2H]
+        log_s_per_frame = self.head(feat).squeeze(-1)        # [B,S]
+        return log_s_per_frame.mean(dim=1) + self.log_scale_bias  # [B]
